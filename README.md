@@ -1,97 +1,108 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Schema-Based Multi-Tenant Application
 
-# Getting Started
+This React Native application implements a multi-tenant architecture using Supabase schemas. Users can select between different database schemas (`s22` or `big7`) to access their specific data.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## How It Works
 
-## Step 1: Start Metro
+### 1. Schema Selection (Opening Screen)
+- Users are presented with a list of available schemas: `s22` and `big7`
+- These schemas must match your Supabase Data API configuration
+- Users select their schema using a visual picker interface
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
-
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+### 2. Navigation Flow
+```
+Opening Screen → Select Schema → Login/Register Screen
+     ↓              ↓                    ↓
+  Schema List   clientId param    Schema-specific DB operations
 ```
 
-## Step 2: Build and run your app
+### 3. Route Parameters
+The selected schema is passed as `clientId` parameter to subsequent screens:
+- `Login` screen receives `{ clientId: "s22" }` or `{ clientId: "big7" }`
+- `Register` screen receives the same parameter
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+### 4. Database Operations
+Each screen uses the `clientId` to create schema-specific database operations:
+```typescript
+const schemaClient = createSchemaSpecificClient(clientId);
+// This creates operations like: s22.profiles, big7.profiles
 ```
 
-### iOS
+## Supabase Configuration
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+### Data API Settings
+Your Supabase project must have the following Data API configuration:
+- **Exposed schemas**: `s22`, `big7`
+- **Extra search path**: `s22, big7`
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+### Schema Structure
+Each schema should contain:
+- `profiles` table for user data
+- Authentication tables (handled by Supabase Auth)
 
-```sh
-bundle install
+### Row Level Security (RLS)
+The schemas use RLS policies that require authentication:
+- Users can only access their own profile data
+- Admin users can access all profile data
+- Unauthenticated access returns permission denied (42501) - this is expected behavior
+
+## Permission Error Handling
+
+### Error Code 42501 (Permission Denied)
+This error occurs when trying to access schemas with RLS policies without authentication. The application handles this gracefully:
+
+- **Schema Validation**: Treats 42501 errors as valid schema existence (requires auth)
+- **Authentication Check**: All schema operations check authentication status first
+- **User Feedback**: Clear error messages guide users to authenticate
+
+### Expected Flow
+1. User selects schema (s22 or big7)
+2. Schema validation succeeds (even with 42501 error)
+3. User proceeds to login/register
+4. After authentication, schema operations work normally
+
+## File Structure
+
+```
+screens/
+├── opening_screen.tsx    # Schema selection interface
+├── login_screen.tsx      # Login with schema-specific operations
+└── register_screen.tsx   # Registration with schema-specific operations
+
+utils/
+└── supabaseSchemaClient.ts  # Schema-specific database client
 ```
 
-Then, and every time you update your native dependencies, run:
+## Key Features
 
-```sh
-bundle exec pod install
-```
+- ✅ **Schema Validation**: Only allows `s22` and `big7` schemas
+- ✅ **Supabase Validation**: Validates schemas with Supabase before proceeding
+- ✅ **Visual Selection**: User-friendly schema picker interface
+- ✅ **Route Parameters**: Selected schema passed as `clientId`
+- ✅ **Database Isolation**: Each schema has separate data
+- ✅ **Visual Feedback**: Shows selected schema and validation status
+- ✅ **Real-time Validation**: Test schema connectivity before login/register
+- ✅ **Permission Error Handling**: Gracefully handles 42501 permission errors
+- ✅ **Authentication Checks**: Validates user auth before schema operations
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+## Usage
 
-```sh
-# Using npm
-npm run ios
+1. User opens the app
+2. User selects their schema (`s22` or `big7`)
+3. User can optionally validate the schema with Supabase
+4. User presses Continue to proceed to Login or Register
+5. Schema is validated with Supabase before navigation
+6. All database operations use the selected schema
+7. User data is isolated to their chosen schema
 
-# OR using Yarn
-yarn ios
-```
+## Schema Validation
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+The app now validates schemas with Supabase before allowing users to proceed:
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+- **Validation Process**: Attempts to query the `profiles` table in the selected schema
+- **Error Handling**: Detects PGRST106 errors (schema not exposed in Data API)
+- **Permission Handling**: Treats 42501 errors as valid (schema exists, requires auth)
+- **Visual Feedback**: Shows validation status with success/error messages
+- **Pre-navigation Check**: Validates schema before navigating to Login/Register screens
 
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+This architecture allows multiple organizations or environments to use the same application while keeping their data completely separate.
